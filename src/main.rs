@@ -1,51 +1,14 @@
 
 #![windows_subsystem = "windows"]
 
-mod fingerprinting {
-    pub mod communication;
-    pub mod algorithm;
-    pub mod signature_format;
-    mod user_agent;
-    mod hanning;
-}
+use songrec::fingerprinting::algorithm::SignatureGenerator;
+use songrec::fingerprinting::signature_format::DecodedSignature;
+use songrec::fingerprinting::communication::recognize_song_from_signature;
 
-mod core {
-    pub mod microphone_thread;
-    pub mod processing_thread;
-    pub mod http_thread;
-    pub mod thread_messages;
-}
-
+use songrec::utils::internationalization::setup_internationalization;
 #[cfg(feature = "gui")]
-mod gui {
-    pub mod main_window;
-    mod song_history_interface;
-    mod preferences;
-}
-
-mod cli {
-    pub mod cli_main;
-}
-
-mod utils {
-    #[cfg(feature = "gui")]
-    pub mod pulseaudio_loopback;
-    pub mod ffmpeg_wrapper;
-    pub mod csv_song_history;
-    pub mod internationalization;
-    pub mod mpris_player;
-    pub mod thread;
-    pub mod filesystem_operations;
-}
-
-use crate::fingerprinting::algorithm::SignatureGenerator;
-use crate::fingerprinting::signature_format::DecodedSignature;
-use crate::fingerprinting::communication::recognize_song_from_signature;
-
-use crate::utils::internationalization::setup_internationalization;
-#[cfg(feature = "gui")]
-use crate::gui::main_window::gui_main;
-use crate::cli::cli_main::{cli_main, CLIParameters, CLIOutputType};
+use songrec::gui::main_window::gui_main;
+use songrec::cli::cli_main::{cli_main, CLIParameters, CLIOutputType};
 
 use std::error::Error;
 use gettextrs::gettext;
