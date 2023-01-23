@@ -27,6 +27,7 @@ pub mod cli {
 pub mod utils {
     pub mod csv_song_history;
     pub mod ffmpeg_wrapper;
+    #[cfg(feature = "gui")]
     pub mod filesystem_operations;
     pub mod internationalization;
     pub mod mpris_player;
