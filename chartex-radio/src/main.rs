@@ -3,6 +3,7 @@ use std::fs;
 use std::time::Instant;
 
 use futures_util::StreamExt;
+use serde_json::Value;
 use songrec::fingerprinting::algorithm::SignatureGenerator;
 use songrec::fingerprinting::communication::recognize_song_from_signature;
 
@@ -13,7 +14,7 @@ async fn main() -> anyhow::Result<()> {
     let stream_file = env::args()
         .nth(3)
         .unwrap_or_else(|| String::from("stream.out"));
-    let mut stream = reqwest::get(station).await?.bytes_stream();
+    let mut stream = reqwest::get(&station).await?.bytes_stream();
     let mut chunks = Vec::<u8>::new();
     let mut time = Instant::now();
     while let Some(chunk) = stream.next().await {
@@ -27,7 +28,10 @@ async fn main() -> anyhow::Result<()> {
         fs::write(&stream_file, &chunks).unwrap();
         match SignatureGenerator::make_signature_from_file(&stream_file) {
             Ok(signature) => match recognize_song_from_signature(&signature) {
-                Ok(song) => {
+                Ok(mut song) => {
+                    if let Some(song_object) = song.as_object_mut() {
+                        song_object.insert(String::from("station"), Value::from(station.as_str()));
+                    }
                     println!("{}", serde_json::to_string_pretty(&song).unwrap());
                     chunks.clear();
                 }
