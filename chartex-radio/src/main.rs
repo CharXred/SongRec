@@ -1,11 +1,13 @@
 use std::fs;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use argh::FromArgs;
 use futures_util::StreamExt;
 use serde_json::Value;
 use songrec::fingerprinting::algorithm::SignatureGenerator;
 use songrec::fingerprinting::communication::recognize_song_from_signature;
+
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 /// Recognize the currently playing track in a radio station.
 #[derive(FromArgs)]
@@ -19,6 +21,9 @@ struct Args {
     /// interval seconds between recognitions
     #[argh(option, short = 'i', default = "5")]
     interval: usize,
+    /// endpoint to send the results
+    #[argh(option, short = 'e')]
+    endpoint: Option<String>,
     /// temporary file for the stream
     #[argh(option, short = 'o', default = "String::from(\"stream.out\")")]
     stream_file: String,
@@ -27,9 +32,14 @@ struct Args {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args: Args = argh::from_env();
+    let client = reqwest::Client::builder()
+        .user_agent(APP_USER_AGENT)
+        .timeout(Duration::from_secs(30))
+        .build()?;
     let mut stream = reqwest::get(&args.station).await?.bytes_stream();
     let mut chunks = Vec::<u8>::new();
     let mut time = Instant::now();
+    println!("Starting...");
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
         chunks.extend(chunk.as_ref().to_vec());
@@ -48,6 +58,18 @@ async fn main() -> anyhow::Result<()> {
                     }
                     if args.debug {
                         println!("{}", serde_json::to_string_pretty(&song).unwrap());
+                    }
+                    if let Some(endpoint) = args.endpoint.as_ref() {
+                        match client.post(endpoint).json(&song).send().await {
+                            Ok(response) => {
+                                if args.debug {
+                                    println!("{}", response.status())
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("{e}");
+                            }
+                        }
                     }
                     chunks.clear();
                 }
