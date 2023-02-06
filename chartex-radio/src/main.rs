@@ -1,38 +1,54 @@
-use std::env;
 use std::fs;
 use std::time::Instant;
 
+use argh::FromArgs;
 use futures_util::StreamExt;
 use serde_json::Value;
 use songrec::fingerprinting::algorithm::SignatureGenerator;
 use songrec::fingerprinting::communication::recognize_song_from_signature;
 
+/// Recognize the currently playing track in a radio station.
+#[derive(FromArgs)]
+struct Args {
+    /// enable debug messages
+    #[argh(switch, short = 'd')]
+    debug: bool,
+    /// radio station URL
+    #[argh(option, short = 's')]
+    station: String,
+    /// interval seconds between recognitions
+    #[argh(option, short = 'i', default = "5")]
+    interval: usize,
+    /// temporary file for the stream
+    #[argh(option, short = 'o', default = "String::from(\"stream.out\")")]
+    stream_file: String,
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let station = env::args().nth(1).expect("no radio station URL given");
-    let interval = env::args().nth(2).and_then(|v| v.parse().ok()).unwrap_or(5);
-    let stream_file = env::args()
-        .nth(3)
-        .unwrap_or_else(|| String::from("stream.out"));
-    let mut stream = reqwest::get(&station).await?.bytes_stream();
+    let args: Args = argh::from_env();
+    let mut stream = reqwest::get(&args.station).await?.bytes_stream();
     let mut chunks = Vec::<u8>::new();
     let mut time = Instant::now();
     while let Some(chunk) = stream.next().await {
         let chunk = chunk?;
         chunks.extend(chunk.as_ref().to_vec());
-        if time.elapsed().as_secs() < interval {
+        if time.elapsed().as_secs() < args.interval as u64 {
             continue;
         } else {
             time = Instant::now();
         }
-        fs::write(&stream_file, &chunks).unwrap();
-        match SignatureGenerator::make_signature_from_file(&stream_file) {
+        fs::write(&args.stream_file, &chunks).unwrap();
+        match SignatureGenerator::make_signature_from_file(&args.stream_file) {
             Ok(signature) => match recognize_song_from_signature(&signature) {
                 Ok(mut song) => {
                     if let Some(song_object) = song.as_object_mut() {
-                        song_object.insert(String::from("station"), Value::from(station.as_str()));
+                        song_object
+                            .insert(String::from("station"), Value::from(args.station.as_str()));
                     }
-                    println!("{}", serde_json::to_string_pretty(&song).unwrap());
+                    if args.debug {
+                        println!("{}", serde_json::to_string_pretty(&song).unwrap());
+                    }
                     chunks.clear();
                 }
                 Err(e) => {
