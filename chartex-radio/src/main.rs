@@ -35,6 +35,7 @@ async fn main() -> anyhow::Result<()> {
     let client = reqwest::Client::builder()
         .user_agent(APP_USER_AGENT)
         .timeout(Duration::from_secs(30))
+        .pool_max_idle_per_host(0)
         .build()?;
     let mut stream = reqwest::get(&args.station).await?.bytes_stream();
     let mut chunks = Vec::<u8>::new();
