@@ -2,6 +2,7 @@ use std::fs;
 use std::time::{Duration, Instant};
 
 use argh::FromArgs;
+use chrono::Utc;
 use futures_util::StreamExt;
 use serde_json::Value;
 use songrec::fingerprinting::algorithm::SignatureGenerator;
@@ -56,6 +57,8 @@ async fn main() -> anyhow::Result<()> {
                     if let Some(song_object) = song.as_object_mut() {
                         song_object
                             .insert(String::from("station"), Value::from(args.station.as_str()));
+                        song_object
+                            .insert(String::from("time"), Value::from(Utc::now().to_rfc3339()));
                     }
                     if args.debug {
                         println!("{}", serde_json::to_string_pretty(&song).unwrap());
