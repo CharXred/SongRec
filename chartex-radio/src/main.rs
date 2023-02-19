@@ -3,6 +3,7 @@ use std::time::{Duration, Instant};
 
 use argh::FromArgs;
 use chrono::Utc;
+use futures_util::StreamExt;
 use serde_json::Value;
 use songrec::fingerprinting::algorithm::SignatureGenerator;
 use songrec::fingerprinting::communication::recognize_song_from_signature;
@@ -37,18 +38,27 @@ async fn main() -> anyhow::Result<()> {
         .timeout(Duration::from_secs(30))
         .pool_max_idle_per_host(0)
         .build()?;
-    let mut stream = client.get(&args.station).send().await?;
+    let mut stream = reqwest::Client::builder()
+        .http2_keep_alive_while_idle(true)
+        .pool_idle_timeout(None)
+        .pool_max_idle_per_host(usize::MAX)
+        .build()?
+        .get(&args.station)
+        .send()
+        .await?
+        .bytes_stream();
     let mut chunks = Vec::<u8>::new();
     let mut time = Instant::now();
     println!("Starting...");
-    while let Some(chunk) = stream.chunk().await? {
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk?;
         chunks.extend(chunk.as_ref().to_vec());
         if time.elapsed().as_secs() < args.interval as u64 {
             continue;
         } else {
             time = Instant::now();
         }
-        fs::write(&args.stream_file, &chunks).unwrap();
+        fs::write(&args.stream_file, &chunks)?;
         match SignatureGenerator::make_signature_from_file(&args.stream_file) {
             Ok(signature) => match recognize_song_from_signature(&signature) {
                 Ok(mut song) => {
@@ -59,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
                             .insert(String::from("time"), Value::from(Utc::now().to_rfc3339()));
                     }
                     if args.debug {
-                        println!("{}", serde_json::to_string_pretty(&song).unwrap());
+                        println!("{}", serde_json::to_string_pretty(&song)?);
                     }
                     if let Some(endpoint) = args.endpoint.as_ref() {
                         match client.post(endpoint).json(&song).send().await {
