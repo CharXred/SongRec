@@ -3,7 +3,6 @@ use std::time::{Duration, Instant};
 
 use argh::FromArgs;
 use chrono::Utc;
-use futures_util::StreamExt;
 use serde_json::Value;
 use songrec::fingerprinting::algorithm::SignatureGenerator;
 use songrec::fingerprinting::communication::recognize_song_from_signature;
@@ -38,12 +37,11 @@ async fn main() -> anyhow::Result<()> {
         .timeout(Duration::from_secs(30))
         .pool_max_idle_per_host(0)
         .build()?;
-    let mut stream = reqwest::get(&args.station).await?.bytes_stream();
+    let mut stream = client.get(&args.station).send().await?;
     let mut chunks = Vec::<u8>::new();
     let mut time = Instant::now();
     println!("Starting...");
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk?;
+    while let Some(chunk) = stream.chunk().await? {
         chunks.extend(chunk.as_ref().to_vec());
         if time.elapsed().as_secs() < args.interval as u64 {
             continue;
@@ -67,22 +65,22 @@ async fn main() -> anyhow::Result<()> {
                         match client.post(endpoint).json(&song).send().await {
                             Ok(response) => {
                                 if args.debug {
-                                    println!("{}", response.status())
+                                    println!("Endpoint response: {}", response.status())
                                 }
                             }
                             Err(e) => {
-                                eprintln!("{e}");
+                                eprintln!("Endpoint error: {e}");
                             }
                         }
                     }
                     chunks.clear();
                 }
                 Err(e) => {
-                    eprintln!("{e}");
+                    eprintln!("Recognize error: {e}");
                 }
             },
             Err(e) => {
-                eprintln!("{e}");
+                eprintln!("Signature error: {e}");
             }
         }
     }

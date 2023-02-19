@@ -270,7 +270,6 @@ dependencies = [
  "anyhow",
  "argh",
  "chrono",
- "futures-util",
  "reqwest 0.11.14",
  "serde_json",
  "songrec",
@@ -710,7 +709,6 @@ dependencies = [
  "futures-core",
  "futures-io",
  "futures-macro",
- "futures-sink",
  "futures-task",
  "memchr",
  "pin-project-lite 0.2.9",
@@ -2147,12 +2145,10 @@ dependencies = [
  "serde_urlencoded",
  "tokio 1.25.0",
  "tokio-native-tls",
- "tokio-util 0.7.4",
  "tower-service",
  "url",
  "wasm-bindgen",
  "wasm-bindgen-futures",
- "wasm-streams",
  "web-sys",
  "winreg 0.10.1",
 ]
@@ -3145,19 +3141,6 @@ name = "wasm-bindgen-shared"
 version = "0.2.84"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0046fef7e28c3804e5e38bfa31ea2a0f73905319b677e57ebe37e49358989b5d"
-
-[[package]]
-name = "wasm-streams"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bbae3363c08332cadccd13b67db371814cd214c2524020932f0804b8cf7c078"
-dependencies = [
- "futures-util",
- "js-sys",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
 
 [[package]]
 name = "web-sys"
