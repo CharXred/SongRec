@@ -19,5 +19,6 @@ RUN apt-get update && \
     libasound2-dev libgtk-3-dev ca-certificates ffmpeg \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 WORKDIR /app/
-COPY --from=builder /app/build-out/chartex-radio /usr/local/bin/
-ENTRYPOINT [ "chartex-radio" ]
+COPY --from=builder /app/log4rs.yml .
+COPY --from=builder /app/build-out/chartex-radio .
+ENTRYPOINT [ "./chartex-radio" ]

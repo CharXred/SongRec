@@ -1,5 +1,5 @@
-use std::fs;
 use std::time::{Duration, Instant};
+use std::{env, fs};
 
 use anyhow::anyhow;
 use argh::FromArgs;
@@ -57,25 +57,21 @@ async fn start(args: &Args, client: &Client, stream_client: &Client) -> anyhow::
                     song_object.insert(String::from("station"), Value::from(args.station.as_str()));
                     song_object.insert(String::from("time"), Value::from(Utc::now().to_rfc3339()));
                 }
-                if args.debug {
-                    println!("{}", serde_json::to_string_pretty(&song)?);
-                }
+                log::debug!("{}", serde_json::to_string_pretty(&song)?);
                 if let Some(endpoint) = args.endpoint.as_ref() {
                     match client.post(endpoint).json(&song).send().await {
                         Ok(response) => {
-                            if args.debug {
-                                println!("Endpoint response: {}", response.status())
-                            }
+                            log::debug!("Endpoint response: {}", response.status())
                         }
                         Err(e) => {
-                            eprintln!("Endpoint error: {e}");
+                            log::error!("Endpoint error: {e}");
                         }
                     }
                 }
                 chunks.clear();
             }
             Err(e) => {
-                eprintln!("Recognize error: {e}");
+                log::error!("Recognize error: {e}");
             }
         }
     }
@@ -84,7 +80,11 @@ async fn start(args: &Args, client: &Client, stream_client: &Client) -> anyhow::
 
 fn main() -> anyhow::Result<()> {
     let args: Args = argh::from_env();
-    println!("Starting...");
+    if args.debug {
+        env::set_var("RUST_LOG", "debug");
+    }
+    log4rs::init_file("log4rs.yml", Default::default())?;
+    log::info!("Starting...");
     let client = Client::builder()
         .user_agent(APP_USER_AGENT)
         .timeout(Duration::from_secs(30))
@@ -101,7 +101,7 @@ fn main() -> anyhow::Result<()> {
     loop {
         runtime.block_on(async {
             if let Err(e) = start(&args, &client, &stream_client).await {
-                eprintln!("Error occurred: {e}");
+                log::error!("Error occurred: {e}");
             }
         });
     }
