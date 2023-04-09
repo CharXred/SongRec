@@ -14,7 +14,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: viorelnanaured/radio-scanner
+          images: |
+            viorelnanaured/radio-scanner
+            orhunp/chartex-radio
           tags: type=raw,value=latest
 
       - name: Set up Docker Buildx
