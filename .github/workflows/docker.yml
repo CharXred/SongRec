@@ -14,9 +14,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: |
-            viorelnanaured/radio-scanner
-            orhunp/chartex-radio
+          images: orhunp/chartex-radio
           tags: type=raw,value=latest
 
       - name: Set up Docker Buildx
@@ -35,8 +33,8 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v2
         with:
-          username: viorelnanaured
-          password: ${{ secrets.DOCKER_TOKEN }}
+          username: orhunp
+          password: ${{ secrets.DOCKER_TOKEN_ALT }}
 
       - name: Build and push
         id: docker_build
