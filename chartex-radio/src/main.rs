@@ -87,7 +87,6 @@ fn main() -> anyhow::Result<()> {
     log::info!("Starting...");
     let client = Client::builder()
         .user_agent(APP_USER_AGENT)
-        .timeout(Duration::from_secs(30))
         .pool_max_idle_per_host(0)
         .build()?;
     let stream_client = Client::builder()
