@@ -85,19 +85,18 @@ fn main() -> anyhow::Result<()> {
     }
     log4rs::init_file("log4rs.yml", Default::default())?;
     log::info!("Starting...");
-    let client = Client::builder()
-        .user_agent(APP_USER_AGENT)
-        .pool_max_idle_per_host(0)
-        .build()?;
-    let stream_client = Client::builder()
-        .http2_keep_alive_while_idle(true)
-        .pool_idle_timeout(None)
-        .pool_max_idle_per_host(usize::MAX)
-        .build()?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?;
     loop {
+        let client = Client::builder()
+            .user_agent(APP_USER_AGENT)
+            .timeout(Duration::from_secs(120))
+            .build()?;
+        let stream_client = Client::builder()
+            .user_agent(APP_USER_AGENT)
+            .http2_keep_alive_while_idle(true)
+            .build()?;
         runtime.block_on(async {
             if let Err(e) = start(&args, &client, &stream_client).await {
                 log::error!("Error occurred: {e}");
