@@ -41,6 +41,7 @@ async fn start(args: &Args, client: &Client, stream_client: &Client) -> anyhow::
     let mut chunks = Vec::<u8>::new();
     let mut time = Instant::now();
     while let Some(chunk) = stream.next().await {
+        log::info!("Reading bytes from the stream");
         let chunk = chunk?;
         chunks.extend(chunk.as_ref().to_vec());
         if time.elapsed().as_secs() < args.interval as u64 {
@@ -48,20 +49,25 @@ async fn start(args: &Args, client: &Client, stream_client: &Client) -> anyhow::
         } else {
             time = Instant::now();
         }
+        log::info!("Saving to a file");
         fs::write(&args.stream_file, &chunks)?;
+        log::info!("Creating a signature");
         let signature = SignatureGenerator::make_signature_from_file(&args.stream_file)
             .map_err(|e| anyhow!("{}", e))?;
+        log::info!("Attempting to recognize song");
         match recognize_song_from_signature(&signature) {
             Ok(mut song) => {
+                log::info!("Song is recognized successfully");
                 if let Some(song_object) = song.as_object_mut() {
                     song_object.insert(String::from("station"), Value::from(args.station.as_str()));
                     song_object.insert(String::from("time"), Value::from(Utc::now().to_rfc3339()));
                 }
                 log::debug!("{}", serde_json::to_string_pretty(&song)?);
                 if let Some(endpoint) = args.endpoint.as_ref() {
+                    log::info!("Sending a request to the endpoint");
                     match client.post(endpoint).json(&song).send().await {
                         Ok(response) => {
-                            log::debug!("Endpoint response: {}", response.status())
+                            log::info!("Endpoint response: {}", response.status())
                         }
                         Err(e) => {
                             log::error!("Endpoint error: {e}");
