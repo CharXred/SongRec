@@ -117,13 +117,9 @@ fn main() -> anyhow::Result<()> {
             let timeout_task = tokio::spawn(async move {
                 log::info!("Waiting for {}ms", task_timeout);
                 tokio::time::sleep(Duration::from_millis(task_timeout)).await;
-                if !main_task.is_finished() {
-                    main_task.abort();
-                    tx_cloned.send(()).unwrap();
-                    log::warn!("Task timed out!");
-                } else {
-                    log::info!("Task were successful");
-                }
+                log::warn!("Task timed out!");
+                main_task.abort();
+                tx_cloned.send(()).unwrap();
             });
             rx.recv().await;
             timeout_task.abort();
