@@ -93,7 +93,7 @@ fn main() -> anyhow::Result<()> {
         .enable_all()
         .thread_stack_size(20 * 1024 * 1024)
         .build()?;
-    let task_timeout = args.interval as u64 * 1000;
+    let task_timeout = (args.interval as u64 * 2 * 1000) + (60 * 1000);
     runtime.block_on(async {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<()>();
         loop {
