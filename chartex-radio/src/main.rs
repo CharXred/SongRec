@@ -2,6 +2,7 @@ use anyhow::anyhow;
 use argh::FromArgs;
 use chrono::Utc;
 use futures_util::StreamExt;
+use m3u8_rs::Playlist;
 use reqwest::Client;
 use serde_json::Value;
 use songrec::fingerprinting::algorithm::SignatureGenerator;
@@ -9,6 +10,7 @@ use songrec::fingerprinting::communication::recognize_song_from_signature;
 use std::time::{Duration, Instant};
 use std::{env, fs};
 use tokio::sync::mpsc::UnboundedSender;
+use url::Url;
 
 static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
@@ -32,58 +34,78 @@ struct Args {
     stream_file: String,
 }
 
+async fn recognize(args: &Args, client: &Client) -> Result<(), anyhow::Error> {
+    log::info!("Creating a signature");
+    let signature = SignatureGenerator::make_signature_from_file(&args.stream_file)
+        .map_err(|e| anyhow!("{}", e))?;
+    log::info!("Attempting to recognize song");
+    let mut song = recognize_song_from_signature(&signature).map_err(|e| anyhow!("{}", e))?;
+    log::info!("Song is recognized successfully");
+    if let Some(song_object) = song.as_object_mut() {
+        song_object.insert(String::from("station"), Value::from(args.station.as_str()));
+        song_object.insert(String::from("time"), Value::from(Utc::now().to_rfc3339()));
+    }
+    log::debug!("{}", serde_json::to_string_pretty(&song)?);
+    Ok(if let Some(endpoint) = args.endpoint.as_ref() {
+        log::info!("Sending a request to the endpoint");
+        match client.post(endpoint).json(&song).send().await {
+            Ok(response) => {
+                log::info!("Endpoint response: {}", response.status())
+            }
+            Err(e) => {
+                log::error!("Endpoint error: {e}");
+            }
+        }
+    })
+}
+
 async fn start(
     args: &Args,
     client: &Client,
     stream_client: &Client,
     tx: &UnboundedSender<()>,
+    is_file: bool,
 ) -> anyhow::Result<()> {
-    let mut stream = stream_client
-        .get(&args.station)
-        .send()
-        .await?
-        .bytes_stream();
-    let mut chunks = Vec::<u8>::new();
-    let time = Instant::now();
-    log::info!("Reading bytes from stream");
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk?;
-        chunks.extend(chunk.as_ref().to_vec());
-        if time.elapsed().as_secs() < args.interval as u64 {
-            continue;
-        }
+    if is_file {
+        log::info!("Reading bytes from the file");
+        let bytes = stream_client
+            .get(&args.station)
+            .send()
+            .await?
+            .bytes()
+            .await?;
         log::info!("Saving to a file");
-        fs::write(&args.stream_file, &chunks)?;
-        log::info!("Creating a signature");
-        let signature = SignatureGenerator::make_signature_from_file(&args.stream_file)
-            .map_err(|e| anyhow!("{}", e))?;
-        log::info!("Attempting to recognize song");
-        let mut song = recognize_song_from_signature(&signature).map_err(|e| anyhow!("{}", e))?;
-        log::info!("Song is recognized successfully");
-        if let Some(song_object) = song.as_object_mut() {
-            song_object.insert(String::from("station"), Value::from(args.station.as_str()));
-            song_object.insert(String::from("time"), Value::from(Utc::now().to_rfc3339()));
-        }
-        log::debug!("{}", serde_json::to_string_pretty(&song)?);
-        if let Some(endpoint) = args.endpoint.as_ref() {
-            log::info!("Sending a request to the endpoint");
-            match client.post(endpoint).json(&song).send().await {
-                Ok(response) => {
-                    log::info!("Endpoint response: {}", response.status())
-                }
-                Err(e) => {
-                    log::error!("Endpoint error: {e}");
-                }
-            }
-        }
+        fs::write(&args.stream_file, &bytes)?;
+        recognize(args, client).await?;
+        tokio::time::sleep(Duration::from_secs(args.interval as u64)).await;
         tx.send(())?;
-        break;
+    } else {
+        let mut stream = stream_client
+            .get(&args.station)
+            .send()
+            .await?
+            .bytes_stream();
+        let mut chunks = Vec::<u8>::new();
+        let time = Instant::now();
+        log::info!("Reading bytes from stream");
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk?;
+            chunks.extend(chunk.as_ref().to_vec());
+            if time.elapsed().as_secs() < args.interval as u64 {
+                continue;
+            }
+            log::info!("Saving to a file");
+            fs::write(&args.stream_file, &chunks)?;
+            recognize(args, client).await?;
+            tx.send(())?;
+            break;
+        }
     }
     Ok(())
 }
 
 fn main() -> anyhow::Result<()> {
-    let args: Args = argh::from_env();
+    let mut args: Args = argh::from_env();
     if args.debug {
         env::set_var("RUST_LOG", "debug");
     }
@@ -95,7 +117,29 @@ fn main() -> anyhow::Result<()> {
         .build()?;
     let task_timeout = (args.interval as u64 * 2 * 1000) + (60 * 1000);
     runtime.block_on(async {
+        let mut is_file = false;
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+        let stream_client = Client::builder()
+            .user_agent(APP_USER_AGENT)
+            .http2_keep_alive_while_idle(true)
+            .build()?;
+        if args.station.ends_with(".m3u8") {
+            let bytes = stream_client
+                .get(&args.station)
+                .send()
+                .await?
+                .bytes()
+                .await?;
+            if let Ok(Playlist::MediaPlaylist(pl)) = m3u8_rs::parse_playlist_res(&bytes) {
+                log::info!("{:#?}", pl);
+                let playlist = pl.segments.first().unwrap();
+                args.station = Url::parse(&args.station)?
+                    .join(&playlist.uri.to_string())?
+                    .to_string();
+                args.interval = playlist.duration as usize;
+                is_file = true;
+            }
+        }
         loop {
             let client = Client::builder()
                 .user_agent(APP_USER_AGENT)
@@ -108,7 +152,9 @@ fn main() -> anyhow::Result<()> {
             let args_cloned = args.clone();
             let tx_cloned = tx.clone();
             let main_task = tokio::spawn(async move {
-                if let Err(e) = start(&args_cloned, &client, &stream_client, &tx_cloned).await {
+                if let Err(e) =
+                    start(&args_cloned, &client, &stream_client, &tx_cloned, is_file).await
+                {
                     log::error!("Error occurred: {e}");
                 }
             });

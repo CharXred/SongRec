@@ -17,6 +17,8 @@ argh = "0.1.10"
 chrono = "0.4.23"
 log4rs = "1.2.0"
 log = "0.4.17"
+m3u8-rs = "5.0.4"
+url = "2.4.0"
 
 [dependencies.songrec]
 path = "../."
