@@ -46,7 +46,7 @@ async fn recognize(args: &Args, client: &Client) -> Result<(), anyhow::Error> {
         song_object.insert(String::from("time"), Value::from(Utc::now().to_rfc3339()));
     }
     log::debug!("{}", serde_json::to_string_pretty(&song)?);
-    Ok(if let Some(endpoint) = args.endpoint.as_ref() {
+    if let Some(endpoint) = args.endpoint.as_ref() {
         log::info!("Sending a request to the endpoint");
         match client.post(endpoint).json(&song).send().await {
             Ok(response) => {
@@ -56,7 +56,8 @@ async fn recognize(args: &Args, client: &Client) -> Result<(), anyhow::Error> {
                 log::error!("Endpoint error: {e}");
             }
         }
-    })
+    }
+    Ok(())
 }
 
 async fn start(
@@ -123,24 +124,24 @@ fn main() -> anyhow::Result<()> {
             .user_agent(APP_USER_AGENT)
             .http2_keep_alive_while_idle(true)
             .build()?;
-        if args.station.ends_with(".m3u8") {
-            let bytes = stream_client
-                .get(&args.station)
-                .send()
-                .await?
-                .bytes()
-                .await?;
-            if let Ok(Playlist::MediaPlaylist(pl)) = m3u8_rs::parse_playlist_res(&bytes) {
-                log::info!("{:#?}", pl);
-                let playlist = pl.segments.first().unwrap();
-                args.station = Url::parse(&args.station)?
-                    .join(&playlist.uri.to_string())?
-                    .to_string();
-                args.interval = playlist.duration as usize;
-                is_file = true;
-            }
-        }
         loop {
+            if args.station.ends_with(".m3u8") {
+                let bytes = stream_client
+                    .get(&args.station)
+                    .send()
+                    .await?
+                    .bytes()
+                    .await?;
+                if let Ok(Playlist::MediaPlaylist(pl)) = m3u8_rs::parse_playlist_res(&bytes) {
+                    log::info!("{:#?}", pl);
+                    let playlist = pl.segments.first().unwrap();
+                    args.station = Url::parse(&args.station)?
+                        .join(&playlist.uri.to_string())?
+                        .to_string();
+                    args.interval = playlist.duration as usize;
+                    is_file = true;
+                }
+            }
             let client = Client::builder()
                 .user_agent(APP_USER_AGENT)
                 .timeout(Duration::from_secs(120))
