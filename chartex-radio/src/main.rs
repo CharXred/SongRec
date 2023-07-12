@@ -34,7 +34,7 @@ struct Args {
     stream_file: String,
 }
 
-async fn recognize(args: &Args, client: &Client) -> Result<(), anyhow::Error> {
+async fn recognize(args: &Args, station: &str, client: &Client) -> Result<(), anyhow::Error> {
     log::info!("Creating a signature");
     let signature = SignatureGenerator::make_signature_from_file(&args.stream_file)
         .map_err(|e| anyhow!("{}", e))?;
@@ -42,7 +42,7 @@ async fn recognize(args: &Args, client: &Client) -> Result<(), anyhow::Error> {
     let mut song = recognize_song_from_signature(&signature).map_err(|e| anyhow!("{}", e))?;
     log::info!("Song is recognized successfully");
     if let Some(song_object) = song.as_object_mut() {
-        song_object.insert(String::from("station"), Value::from(args.station.as_str()));
+        song_object.insert(String::from("station"), Value::from(station));
         song_object.insert(String::from("time"), Value::from(Utc::now().to_rfc3339()));
     }
     log::debug!("{}", serde_json::to_string_pretty(&song)?);
@@ -62,6 +62,7 @@ async fn recognize(args: &Args, client: &Client) -> Result<(), anyhow::Error> {
 
 async fn start(
     args: &Args,
+    station: &str,
     client: &Client,
     stream_client: &Client,
     tx: &UnboundedSender<()>,
@@ -77,7 +78,7 @@ async fn start(
             .await?;
         log::info!("Saving to a file");
         fs::write(&args.stream_file, &bytes)?;
-        recognize(args, client).await?;
+        recognize(args, station, client).await?;
         tokio::time::sleep(Duration::from_secs(args.interval as u64)).await;
         tx.send(())?;
     } else {
@@ -97,7 +98,7 @@ async fn start(
             }
             log::info!("Saving to a file");
             fs::write(&args.stream_file, &chunks)?;
-            recognize(args, client).await?;
+            recognize(args, station, client).await?;
             tx.send(())?;
             break;
         }
@@ -124,6 +125,7 @@ fn main() -> anyhow::Result<()> {
             .user_agent(APP_USER_AGENT)
             .http2_keep_alive_while_idle(true)
             .build()?;
+        let original_station = args.station.clone();
         loop {
             if args.station.ends_with(".m3u8") {
                 let bytes = stream_client
@@ -152,9 +154,17 @@ fn main() -> anyhow::Result<()> {
                 .build()?;
             let args_cloned = args.clone();
             let tx_cloned = tx.clone();
+            let original_station = original_station.clone();
             let main_task = tokio::spawn(async move {
-                if let Err(e) =
-                    start(&args_cloned, &client, &stream_client, &tx_cloned, is_file).await
+                if let Err(e) = start(
+                    &args_cloned,
+                    &original_station,
+                    &client,
+                    &stream_client,
+                    &tx_cloned,
+                    is_file,
+                )
+                .await
                 {
                     log::error!("Error occurred: {e}");
                 }
