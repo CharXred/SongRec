@@ -127,9 +127,9 @@ fn main() -> anyhow::Result<()> {
             .build()?;
         let original_station = args.station.clone();
         loop {
-            if args.station.ends_with(".m3u8") {
+            if original_station.ends_with(".m3u8") {
                 let bytes = stream_client
-                    .get(&args.station)
+                    .get(&original_station)
                     .send()
                     .await?
                     .bytes()
@@ -141,6 +141,7 @@ fn main() -> anyhow::Result<()> {
                         .join(&playlist.uri.to_string())?
                         .to_string();
                     args.interval = playlist.duration as usize;
+                    log::info!("Station URL: {:#?}", args.station);
                     is_file = true;
                 }
             }
