@@ -167,6 +167,9 @@ fn main() -> anyhow::Result<()> {
                 .await
                 {
                     log::error!("Error occurred: {e}");
+                    if let Err(e) = tx_cloned.send(()) {
+                        log::error!("Send error: {e}");
+                    }
                 }
             });
             log::info!("New task spawned");
