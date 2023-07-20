@@ -128,21 +128,37 @@ fn main() -> anyhow::Result<()> {
         let original_station = args.station.clone();
         loop {
             if original_station.ends_with(".m3u8") {
-                let bytes = stream_client
-                    .get(&original_station)
-                    .send()
-                    .await?
-                    .bytes()
-                    .await?;
-                if let Ok(Playlist::MediaPlaylist(pl)) = m3u8_rs::parse_playlist_res(&bytes) {
-                    log::info!("{:#?}", pl);
-                    let playlist = pl.segments.first().unwrap();
-                    args.station = Url::parse(&args.station)?
-                        .join(&playlist.uri.to_string())?
-                        .to_string();
-                    args.interval = playlist.duration as usize;
-                    log::info!("Station URL: {:#?}", args.station);
-                    is_file = true;
+                let mut station_url = original_station.clone();
+                loop {
+                    let bytes = stream_client
+                        .get(&station_url)
+                        .send()
+                        .await?
+                        .bytes()
+                        .await?;
+                    match m3u8_rs::parse_playlist_res(&bytes) {
+                        Ok(Playlist::MediaPlaylist(pl)) => {
+                            log::info!("{:#?}", pl);
+                            let playlist = pl.segments.first().unwrap();
+                            args.station = Url::parse(&args.station)?
+                                .join(&playlist.uri.to_string())?
+                                .to_string();
+                            args.interval = playlist.duration as usize;
+                            log::info!("Station URL: {:#?}", args.station);
+                            is_file = true;
+                            break;
+                        }
+                        Ok(Playlist::MasterPlaylist(pl)) => {
+                            log::info!("{:#?}", pl);
+                            station_url = Url::parse(&args.station)?
+                                .join(&pl.variants.first().unwrap().uri)?
+                                .to_string();
+                        }
+                        Err(e) => {
+                            log::error!("{e}");
+                            break;
+                        }
+                    }
                 }
             }
             let client = Client::builder()
