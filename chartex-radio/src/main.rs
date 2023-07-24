@@ -106,6 +106,21 @@ async fn start(
     Ok(())
 }
 
+fn parse_station(uri: &str, station: &str) -> anyhow::Result<String> {
+    let station = if uri.starts_with(":///") {
+        let url = Url::parse(station)?;
+        url.host_str()
+            .and_then(|v| Url::parse(&format!("{}://{v}", url.scheme())).ok())
+            .unwrap()
+            .join(uri.trim_start_matches(":///"))
+    } else {
+        Url::parse(station)?.join(uri)
+    }?
+    .to_string();
+    log::info!("Parsed station: {station}");
+    Ok(station)
+}
+
 fn main() -> anyhow::Result<()> {
     let mut args: Args = argh::from_env();
     if args.debug {
@@ -140,9 +155,7 @@ fn main() -> anyhow::Result<()> {
                         Ok(Playlist::MediaPlaylist(pl)) => {
                             log::info!("{:#?}", pl);
                             let playlist = pl.segments.first().unwrap();
-                            args.station = Url::parse(&args.station)?
-                                .join(&playlist.uri.to_string())?
-                                .to_string();
+                            args.station = parse_station(&playlist.uri, &args.station)?;
                             args.interval = playlist.duration as usize;
                             log::info!("Station URL: {:#?}", args.station);
                             is_file = true;
@@ -150,9 +163,8 @@ fn main() -> anyhow::Result<()> {
                         }
                         Ok(Playlist::MasterPlaylist(pl)) => {
                             log::info!("{:#?}", pl);
-                            station_url = Url::parse(&args.station)?
-                                .join(&pl.variants.first().unwrap().uri)?
-                                .to_string();
+                            let uri = pl.variants.first().unwrap().uri.to_string();
+                            station_url = parse_station(&uri, &args.station)?;
                         }
                         Err(e) => {
                             log::error!("{e}");
