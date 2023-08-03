@@ -113,6 +113,8 @@ fn parse_station(uri: &str, station: &str) -> anyhow::Result<String> {
             .and_then(|v| Url::parse(&format!("{}://{v}", url.scheme())).ok())
             .unwrap()
             .join(uri.trim_start_matches(":///"))
+    } else if uri.starts_with("https://") {
+        Url::parse(uri)
     } else {
         Url::parse(station)?.join(uri)
     }?
@@ -155,7 +157,7 @@ fn main() -> anyhow::Result<()> {
                         Ok(Playlist::MediaPlaylist(pl)) => {
                             log::info!("{:#?}", pl);
                             let playlist = pl.segments.first().unwrap();
-                            args.station = parse_station(&playlist.uri, &args.station)?;
+                            args.station = parse_station(&playlist.uri, &station_url)?;
                             args.interval = playlist.duration as usize;
                             log::info!("Station URL: {:#?}", args.station);
                             is_file = true;
