@@ -45,7 +45,7 @@ async fn recognize(args: &Args, station: &str, client: &Client) -> Result<(), an
         song_object.insert(String::from("station"), Value::from(station));
         song_object.insert(String::from("time"), Value::from(Utc::now().to_rfc3339()));
     }
-    log::debug!("{}", serde_json::to_string_pretty(&song)?);
+    log::info!("{}", serde_json::to_string(&song)?);
     if let Some(endpoint) = args.endpoint.as_ref() {
         log::info!("Sending a request to the endpoint");
         match client.post(endpoint).json(&song).send().await {

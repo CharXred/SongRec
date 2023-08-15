@@ -13,7 +13,6 @@ appenders:
       pattern: "{l} {M} {d} - {m}{n}"
 
 root:
-  level: debug
+  level: info
   appenders:
     - stdout
-    - file
