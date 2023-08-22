@@ -42,7 +42,7 @@ async fn recognize(args: &Args, station: &str, client: &Client) -> Result<(), an
     let mut song = recognize_song_from_signature(&signature).map_err(|e| anyhow!("{}", e))?;
     log::info!("Song is recognized successfully");
     if let Some(song_object) = song.as_object_mut() {
-        song_object.insert(String::from("station"), Value::from(station));
+        song_object.insert(String::from("station"), Value::from(station.trim()));
         song_object.insert(String::from("time"), Value::from(Utc::now().to_rfc3339()));
     }
     log::info!("{}", serde_json::to_string(&song)?);
