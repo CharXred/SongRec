@@ -1,0 +1,3 @@
+image = "viorelnanaured/radio-scanner"
+endpoint = "https://redmusic.ro/soft/extractors/chartex/chartex_radio_extractor/add_radio_statistics"
+interval = 60

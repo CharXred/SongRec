@@ -1,0 +1,15 @@
+version: "3.6"
+services:
+  server:
+    image: orhunp/radio-server:${IMAGE_TAG:-latest}
+    build: .
+    container_name: radio-server
+    restart: always
+    environment:
+      - RUST_LOG=debug
+    env_file:
+      - ./.env
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./config.toml:/app/config.toml
