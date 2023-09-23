@@ -6,23 +6,6 @@ jobs:
   docker:
     name: Docker Build and Push
     runs-on: ubuntu-22.04
-    strategy:
-      fail-fast: false
-      matrix:
-        image: [scanner, server]
-        include:
-          - image: scanner
-            image_name: viorelnanaured/radio-scanner
-            username: viorelnanaured
-            secret_name: DOCKER_TOKEN
-            dockerfile: Dockerfile
-            build_context: .
-          - image: server
-            image_name: orhunp/radio-server
-            username: orhunp
-            secret_name: DOCKER_TOKEN_ALT
-            dockerfile: radio-server/Dockerfile
-            build_context: radio-server
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -31,7 +14,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v3
         with:
-          images: ${{ matrix.image_name }}
+          images: viorelnanaured/radio-scanner
           tags: type=raw,value=latest
 
       - name: Set up Docker Buildx
@@ -50,15 +33,15 @@ jobs:
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v2
         with:
-          username: ${{ matrix.username }}
-          password: ${{ secrets[matrix.secret_name] }}
+          username: viorelnanaured
+          password: ${{ secrets.DOCKER_TOKEN }}
 
       - name: Build and push
         id: docker_build
         uses: docker/build-push-action@v2
         with:
-          context: ${{ matrix.build_context }}
-          file: ${{ matrix.dockerfile }}
+          context: ./
+          file: ./Dockerfile
           builder: ${{ steps.buildx.outputs.name }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
