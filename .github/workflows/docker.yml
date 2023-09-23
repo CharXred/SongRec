@@ -16,11 +16,13 @@ jobs:
             username: viorelnanaured
             secret_name: DOCKER_TOKEN
             dockerfile: Dockerfile
+            build_context: .
           - image: server
             image_name: orhunp/radio-server
             username: orhunp
             secret_name: DOCKER_TOKEN_ALT
             dockerfile: radio-server/Dockerfile
+            build_context: radio-server
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -55,7 +57,7 @@ jobs:
         id: docker_build
         uses: docker/build-push-action@v2
         with:
-          context: ./
+          context: ${{ matrix.build_context }}
           file: ${{ matrix.dockerfile }}
           builder: ${{ steps.buildx.outputs.name }}
           push: ${{ github.event_name != 'pull_request' }}
