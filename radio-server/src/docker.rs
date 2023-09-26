@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]
 pub struct Container {
-    id: String,
-    name: String,
+    pub id: String,
+    pub name: String,
 }
 
 pub fn get_running_containers() -> anyhow::Result<Vec<Container>> {

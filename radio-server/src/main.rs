@@ -49,6 +49,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", post(create_radio_station))
         .route("/", get(list_radio_stations))
+        .route("/:name", get(get_radio_station))
         .route("/:name", delete(delete_radio_station))
         .route("/restart/:name", get(restart_radio_station))
         .route("/restart_all", get(restart_all_radio_stations))
@@ -101,6 +102,18 @@ async fn list_radio_stations(AuthBearer(token): AuthBearer) -> Result<impl IntoR
     auth::check(&token)?;
     tracing::info!("Listing radios");
     let containers = docker::get_running_containers()?;
+    Ok(Json(json!({ "success": true, "radios": containers })))
+}
+
+#[debug_handler]
+async fn get_radio_station(
+    Path(name): Path<String>,
+    AuthBearer(token): AuthBearer,
+) -> Result<impl IntoResponse, AppError> {
+    auth::check(&token)?;
+    tracing::info!("Listing radio: {name}");
+    let mut containers = docker::get_running_containers()?;
+    containers.retain(|v| v.name == name);
     Ok(Json(json!({ "success": true, "radios": containers })))
 }
 
