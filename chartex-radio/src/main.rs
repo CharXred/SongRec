@@ -174,6 +174,15 @@ fn main() -> anyhow::Result<()> {
                         }
                     }
                 }
+            } else if original_station.ends_with(".m3u") {
+                let text = stream_client
+                    .get(&original_station)
+                    .send()
+                    .await?
+                    .text()
+                    .await?;
+                args.station = text.lines().next().unwrap().to_string();
+                log::info!("Station URL: {:#?}", args.station);
             }
             let client = Client::builder()
                 .user_agent(APP_USER_AGENT)
