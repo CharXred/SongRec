@@ -53,9 +53,19 @@ pub fn recognize_song_from_signature(signature: &DecodedSignature) -> Result<Val
         .headers(headers)
         .json(&post_data)
         .send()?;
-    
-    Ok(response.json()?)
-    
+
+    let response_text = response.text()?;
+    match serde_json::from_str(&response_text) {
+        Ok(v) => Ok(v),
+        Err(e) => Err(IoError::new(
+            io::ErrorKind::Other,
+            format!(
+                "failed to deserialize JSON: {e} (response: \n===\n{}\n===\n)",
+                response_text
+            ),
+        )
+        .into()),
+    }
 }
 
 pub fn obtain_raw_cover_image(url: &str) -> Result<Vec<u8>, Box<dyn Error>> {
