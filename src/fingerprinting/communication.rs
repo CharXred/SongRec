@@ -1,6 +1,7 @@
 use serde_json::{json, Value};
 use reqwest::header::HeaderMap;
 use std::time::SystemTime;
+use std::io::{self, Error as IoError};
 use std::error::Error;
 use std::time::Duration;
 use rand::seq::SliceRandom;
