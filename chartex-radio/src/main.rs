@@ -79,6 +79,7 @@ async fn start(
         log::info!("Saving to a file");
         fs::write(&args.stream_file, &bytes)?;
         recognize(args, station, client).await?;
+        log::info!("Sleeping for {}", args.interval);
         tokio::time::sleep(Duration::from_secs(args.interval as u64)).await;
         tx.send(())?;
     } else {
@@ -158,7 +159,6 @@ fn main() -> anyhow::Result<()> {
                             log::info!("{:#?}", pl);
                             let playlist = pl.segments.first().unwrap();
                             args.station = parse_station(&playlist.uri, &station_url)?;
-                            args.interval = playlist.duration as usize;
                             log::info!("Station URL: {:#?}", args.station);
                             is_file = true;
                             break;
